@@ -1,0 +1,28 @@
+name: merge-perm-probe
+on: workflow_dispatch
+permissions:
+  pull-requests: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: try merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "--- token permissions are pull-requests:write only"
+          curl -sS -o /tmp/merge.json -w "MERGE_STATUS=%{http_code}\n" -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/1/merge" \
+            -d '{"merge_method":"merge"}'
+          cat /tmp/merge.json
+          echo
+          echo "--- auto-merge enable probe"
+          curl -sS -o /tmp/graphql.json -w "GQL_STATUS=%{http_code}\n" -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/graphql \
+            -d '{"query":"mutation { enablePullRequestAutoMerge(input:{pullRequestId:\"\"}) { clientMutationId } }"}'
+          head -c 400 /tmp/graphql.json
